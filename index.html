@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice Generator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        /* --- General & Form Styles --- */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #ffffff;
+            margin: 0;
+            padding: 20px;
+        }
+        .form-container {
+            max-width: 800px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        h2 { text-align: center; }
+        .form-section {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #ddd;
+        }
+        .form-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+        .form-row > div { flex: 1; }
+        label { font-weight: bold; display: block; margin-bottom: 5px; font-size: 14px;}
+        input[type="text"], input[type="number"], input[type="date"] {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .btn-generate {
+            background-color: #28a745;
+            color: white;
+            padding: 15px;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+            width: 100%;
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        /* --- Hidden Invoice Layout (Strictly 1 Page A4) --- */
+        #invoice-wrapper {
+            position: absolute;
+            left: -9999px; /* Hide off-screen */
+            top: 0;
+        }
+        
+        .invoice-box {
+            width: 210mm;
+            /* Reduced height by 1mm and added overflow: hidden to prevent the blank 2nd page */
+            height: 296mm; 
+            max-height: 296mm;
+            overflow: hidden; 
+            padding: 15mm;
+            background: white;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+            font-size: 13px;
+            color: #000;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header-flex {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .address-box strong { display: block; margin-bottom: 5px; font-size: 16px; }
+        
+        .info-table { width: 50%; border-collapse: collapse; margin-bottom: 15px;}
+        .info-table td { padding: 6px; border: 1px solid #000; }
+        .info-table td:first-child { font-weight: bold; width: 45%; background-color: #ffffff;}
+
+        .gap { height: 10px; } 
+
+        .parts-table { width: 100%; border-collapse: collapse; margin-bottom: 15px;}
+        .parts-table th, .parts-table td { border: 1px solid #000; padding: 7px; text-align: left; }
+        .parts-table th { background-color: #ffffff; }
+        .parts-table td { height: 16px; } 
+        
+        .summary-flex {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+        .summary-left { width: 50%; } 
+        .summary-right { width: 45%; }
+        .summary-table { width: 100%; border-collapse: collapse; }
+        .summary-table td { padding: 6px; border: 1px solid #000; }
+        .summary-table td:first-child { font-weight: bold; background-color: #ffffff; width: 60%;}
+
+        .sign-date-flex {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+        .signature-box { width: 40%; }
+        .signature-line {
+            margin-top: 35px;
+            border-bottom: 1px solid #000;
+        }
+        .date-box { font-weight: bold; }
+
+        .footer {
+            margin-top: auto; 
+            text-align: center;
+            font-size: 12px;
+            font-weight: normal;
+            padding-top: 10px;
+            border-top: 1px solid #ffffff;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="form-container">
+        <h2>Invoice Input Form</h2>
+        
+        <div class="form-section">
+            <div class="form-row">
+                <div>
+                    <label>From: Company Name</label>
+                    <input type="text" id="fromName" value="CV Motors Ltd">
+                    <label>From: Address</label>
+                    <input type="text" id="fromAddress" value="Portland Lodge">
+                    <label>Additional Address <Address></Address></label>
+                    <input type="text" id="fromAdditional" value="Brentwood Road, Bulphan, Upminster.">
+                    <label>Post Code<Address></Address></label>
+                    <input type="text" id="fromCode" value="RM143TJ">
+                    <label>Phone Number</label>
+                    <input type="text" id="fromNumber" value="07761994318.">
+
+                
+                </div>
+                <div>
+                    <label>To: Company Name</label>
+                    <input type="text" id="toName" value="Top of the Range">
+                    <label>To: Address</label>
+                    <input type="text" id="toAddress" value="Portland Lodge">
+                    <label>To: Post Code</label>
+                    <input type="text" id="toCode" value="RM143TJ">
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <div class="form-row">
+                <div><label>Invoice Number</label><input type="text" id="invNum"></div>
+                <div><label>Make Model</label><input type="text" id="makeModel"></div>
+                <div><label>Registration Number</label><input type="text" id="regNum"></div>
+                <div><label>Mileage</label><input type="text" id="mileage"></div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h4>Parts</h4>
+            <div id="parts-inputs">
+                </div>
+        </div>
+
+        <div class="form-section">
+            <h4>Summary Values</h4>
+            <div class="form-row">
+                <div><label>Price Parts (£)</label><input type="number" id="sumParts"></div>
+                <div><label>Labor Work (£)</label><input type="number" id="sumLabor"></div>
+                <div><label>Subtotal Price (£)</label><input type="number" id="sumSub"></div>
+                <div><label>Tax (20%) (£)</label><input type="number" id="sumTax"></div>
+                <div><label>Total Price (£)</label><input type="number" id="sumTotal"></div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <div class="form-row">
+                <div><label>Date</label><input type="date" id="invDate"></div>
+            </div>
+        </div>
+
+        <button class="btn-generate" onclick="generatePDF()">Generate PDF Invoice</button>
+    </div>
+
+    <div id="invoice-wrapper">
+        <div class="invoice-box" id="invoice-content">
+            
+            <div class="header-flex">
+                <div class="address-box">
+                    <strong>Invoice Service</strong>
+                    <span style="font-weight: bold;" id="out-fromName"></span><br>
+                    <span id="out-fromAddress"></span><br>
+                    <span id="out-fromAdditional"></span><br>
+                    <span id="out-fromCode"></span><br>
+                    <span id="out-fromNumber"></span>
+                </div>
+                <div class="address-box" style="text-align: right;">
+                    <strong>Invoice To</strong>
+                    <span id="out-toName" style="font-weight: bold;"></span><br>
+                    <span id="out-toAddress"></span><br>
+                    <span id="out-toCode"></span>
+                </div>
+            </div>
+
+            <table class="info-table">
+                <tr><td>Invoice Number</td><td id="out-invNum"></td></tr>
+                <tr><td>Make Model</td><td id="out-makeModel"></td></tr>
+                <tr><td>Registration Number</td><td id="out-regNum"></td></tr>
+                <tr><td>Mileage</td><td id="out-mileage"></td></tr>
+            </table>
+
+            <div class="gap"></div>
+
+            <table class="parts-table" id="out-partsTable">
+                <thead>
+                    <tr>
+                        <th style="width: 50%;">Parts</th>
+                        <th style="width: 25%;">Quantity/Brand</th>
+                        <th style="width: 25%;">Price Parts (£)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    </tbody>
+            </table>
+
+            <div class="gap"></div>
+
+            <div class="summary-flex">
+                <div class="summary-left"></div> 
+                <div class="summary-right">
+                    <table class="summary-table">
+                        <tr><td>Price Parts</td><td id="out-sumParts"></td></tr>
+                        <tr><td>Labor Work</td><td id="out-sumLabor"></td></tr>
+                        <tr><td>Subtotal Price</td><td id="out-sumSub"></td></tr>
+                        <tr><td>Tax (20%)</td><td id="out-sumTax"></td></tr>
+                        <tr><td>Total Price</td><td id="out-sumTotal"></td></tr>
+                    </table>
+                </div>
+            </div>
+
+            <div class="sign-date-flex">
+                <div class="signature-box">
+                    <h6></h6>
+                    <h6></h6>
+                    <h6></h6>
+                    <h6></h6>
+                    <h6></h6>
+                    <h6></h6>
+                    <div class="signature-line"></div>
+                    <h1></h1>
+                    <strong>Signature</strong>
+                </div>
+                <div class="date-box">
+                    Date: <span id="out-date"></span>
+                </div>
+            </div>
+
+            <div class="footer">
+                CV MOTORS LTD. <br>Vat No: 446370685 <br> Company No: 13646910 <br> CV MOTORS LTD. Sort Code: 20-25-19 Acc 83583589. <br>Thanks for your business.
+            </div>
+            
+        </div>
+    </div>
+
+    <script>
+        const partsContainer = document.getElementById('parts-inputs');
+        for (let i = 0; i < 10; i++) {
+            partsContainer.innerHTML += `
+                <div class="form-row part-row">
+                    <div>${i===0 ? '<label>Part Name</label>' : ''}<input type="text" class="p-name"></div>
+                    <div>${i===0 ? '<label>Quantity/Brand</label>' : ''}<input type="text" class="p-qty"></div>
+                    <div>${i===0 ? '<label>Price (£)</label>' : ''}<input type="number" class="p-price"></div>
+                </div>
+            `;
+        }
+
+        function generatePDF() {
+            document.getElementById('out-fromName').innerText = document.getElementById('fromName').value;
+            document.getElementById('out-fromAddress').innerText = document.getElementById('fromAddress').value;
+            document.getElementById('out-fromAdditional').innerText = document.getElementById('fromAdditional').value;
+            document.getElementById('out-fromCode').innerText = document.getElementById('fromCode').value;
+            document.getElementById('out-fromNumber').innerText = document.getElementById('fromNumber').value;
+
+            document.getElementById('out-toName').innerText = document.getElementById('toName').value;
+            document.getElementById('out-toAddress').innerText = document.getElementById('toAddress').value;
+            document.getElementById('out-toCode').innerText = document.getElementById('toCode').value;
+            
+            document.getElementById('out-invNum').innerText = document.getElementById('invNum').value;
+            document.getElementById('out-makeModel').innerText = document.getElementById('makeModel').value;
+            document.getElementById('out-regNum').innerText = document.getElementById('regNum').value;
+            document.getElementById('out-mileage').innerText = document.getElementById('mileage').value;
+
+            const tbody = document.querySelector('#out-partsTable tbody');
+            tbody.innerHTML = ''; 
+            const partRows = document.querySelectorAll('.part-row');
+            
+            partRows.forEach(row => {
+                const name = row.querySelector('.p-name').value;
+                const qty = row.querySelector('.p-qty').value;
+                const price = row.querySelector('.p-price').value;
+                
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${name || '&nbsp;'}</td>
+                    <td>${qty || '&nbsp;'}</td>
+                    <td>${price ? '£' + price : '&nbsp;'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            const formatPound = (val) => val ? '£' + val : '&nbsp;';
+            document.getElementById('out-sumParts').innerHTML = formatPound(document.getElementById('sumParts').value);
+            document.getElementById('out-sumLabor').innerHTML = formatPound(document.getElementById('sumLabor').value);
+            document.getElementById('out-sumSub').innerHTML = formatPound(document.getElementById('sumSub').value);
+            document.getElementById('out-sumTax').innerHTML = formatPound(document.getElementById('sumTax').value);
+            document.getElementById('out-sumTotal').innerHTML = formatPound(document.getElementById('sumTotal').value);
+
+            const inputDate = document.getElementById('invDate').value;
+            const dateParts = inputDate.split('-');
+            const formattedDate = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
+            document.getElementById('out-date').innerText = formattedDate;
+
+            const element = document.getElementById('invoice-content');
+
+            const opt = {
+                margin:       0,
+                filename:     'Invoice_' + (document.getElementById('invNum').value || 'New') + '.pdf',
+                image:        { type: 'jpeg', quality: 1 },
+                html2canvas:  { scale: 2, scrollY: 0 }, 
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            html2pdf().set(opt).from(element).save();
+        }
+    </script>
+</body>
+</html>
